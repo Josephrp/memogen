@@ -1,0 +1,5 @@
+pyautogen
+openai
+python-docx
+markdown2
+beautifulsoup4

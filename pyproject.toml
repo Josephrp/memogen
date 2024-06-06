@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "autofinmemo"
+version = "0.0.1"
+description = "This is a multiagent application that produces and financial memo as a .docx file with quality control"
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.13"
+pyautogen = "^0.2.28"
+openai = "^1.31.1"
+python-docx = "^1.1.2"
+markdown2 = "^2.4.13"
+beautifulsoup4 = "^4.12.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
