@@ -8,7 +8,7 @@ import os
 from typing import Optional, List, Tuple
 from markdown2 import markdown
 from bs4 import BeautifulSoup
-from src.prompts import file_writer_agent_system_message, writer_system_message, critic_system_message, 
+from src.prompts import file_writer_agent_system_message, writer_system_message, critic_system_message, financial_reviewer_system_message, outliner_system_message
 
 # -------- CODEX
 
@@ -45,6 +45,12 @@ writer = AssistantAgent(
     llm_config=llm_config,
 )
 
+outliner = AssistantAgent(
+    name="Writer",
+    system_message=outliner_system_message,
+    llm_config=llm_config,
+)
+
 # -------- Reviewers
 
 critic = AssistantAgent(
@@ -54,26 +60,17 @@ critic = AssistantAgent(
     system_message=critic_system_message,
 )
 
-SEO_reviewer = AssistantAgent(
-    name="SEO Reviewer",
+layman_reviewer = AssistantAgent(
+    name="Layman Reviewer",
+    description="A reviewer that makes sure a laywoman would fully understand the content provided to her."
     llm_config=llm_config,
-    system_message="You are an SEO reviewer, known for "
-        "your ability to optimize content for search engines, "
-        "ensuring that it ranks well and attracts organic traffic. " 
-        "Make sure your suggestion is concise (within 3 bullet points), "
-        "concrete and to the point. "
-        "Begin the review by stating your role.",
+    system_message=layman_system_message,
 )
 
-legal_reviewer = AssistantAgent(
+financial_reviewer = AssistantAgent(
     name="Legal Reviewer",
     llm_config=llm_config,
-    system_message="You are a legal reviewer, known for "
-        "your ability to ensure that content is legally compliant "
-        "and free from any potential legal issues. "
-        "Make sure your suggestion is concise (within 3 bullet points), "
-        "concrete and to the point. "
-        "Begin the review by stating your role.",
+    system_message=financial_reviewer_system_message,
 )
 
 ethics_reviewer = AssistantAgent(
@@ -95,42 +92,6 @@ meta_reviewer = AssistantAgent(
 )
 
 # --------  Tools
-
-# @file_writer_agent.register_for_execution()
-# @file_writer_agent.register_for_llm(description="create a docx from plain text with the right format for correctly rendering a docx")
-# def create_docx_from_script(script: str, filename: str = 'result.docx', directory: str = '.src/result') -> None:
-#     """
-#     Creates a .docx file from a given script and saves it to the specified directory.
-
-#     :param script: The text content to be saved in the .docx file.
-#     :param filename: The name of the .docx file to be created. Default is 'result.docx'.
-#     :param directory: The directory where the .docx file will be saved. Default is '.src/result'.
-#     :return: None
-
-#     Example usage
-#     script_text = "
-#     This is an example script that will be saved into the .docx file.
-#     You can add more content here as needed.
-#     "
-#     create_docx_from_script(script_text)
-#     """
-#     # Create directory if it does not exist
-#     if not os.path.exists(directory):
-#         os.makedirs(directory)
-    
-#     # Create a new Document
-#     doc = Document()
-    
-#     # Add the script to the document
-#     doc.add_paragraph(script)
-    
-#     # Construct the full path
-#     full_path = os.path.join(directory, filename)
-    
-#     # Save the document
-#     doc.save(full_path)
-#     print(f"Document saved at: {full_path}")
-
 
 
 @file_writer_agent.register_for_execution()
@@ -165,12 +126,16 @@ def read_docx_as_plain_text(filepath: str = '.src/result/result.docx') -> Option
 @file_writer_agent.register_for_llm(description="Appends text to the end of a given title in a .docx file (before the next title) and saves the updated document.")
 def append_text_to_title( title: str, text_to_append: str, doc_path: str= '.src/result/result.docx', save_path: Optional[str] = None ) -> None:
     """
-    Appends text to the end of a given title in a .docx file (before the next title) and saves the updated document.
+    Converts markdown to .docx and appends text to the end of a given title in a .docx file (before the next title) and saves the updated document.
 
     :param title: The title to search for in the document.
     :param text_to_append: The text to append to the end of the section with the specified title.
     :return: None
     """
+    try:
+        # Convert markdown text to Docx-suitable format
+        formatted_text = markdown_to_docx_format(text_to_append)
+     
     try:
         # Load the Document
         doc = Document(doc_path)
@@ -192,7 +157,7 @@ def append_text_to_title( title: str, text_to_append: str, doc_path: str= '.src/
         if found_title:
             if insertion_point is None:
                 # Append to the end of the document if no next title is found
-                doc.add_paragraph(text_to_append)
+                doc.add_paragraph(formatted_text)
             else:
                 # Insert before the next title
                 doc.paragraphs.insert(insertion_point, Paragraph(text_to_append, doc))
@@ -216,7 +181,7 @@ def append_text_to_title( title: str, text_to_append: str, doc_path: str= '.src/
 @file_writer_agent.register_for_llm(description="Replaces the text between the specified title and the next title in a .docx file with new text.")
 def replace_section_with_text(title: str, new_text: str, doc_path: str= '.src/result/result.docx',  save_path: Optional[str] = None) -> None:
     """
-    Replaces the text between the specified title and the next title in a .docx file with new text.
+    Converts Markdown text and Replaces the text between the specified title and the next title in a .docx file with new text.
 
     :param doc_path: The path to the .docx file to be read.
     :param title: The title that marks the beginning of the section to replace.
@@ -224,6 +189,10 @@ def replace_section_with_text(title: str, new_text: str, doc_path: str= '.src/re
     :param save_path: The path to save the updated .docx file. If None, overwrites the original file.
     :return: None
     """
+    try:
+        # Convert markdown text to Docx-suitable format
+        formatted_text = markdown_to_docx_format(new_text)
+     
     try:
         # Load the Document
         doc = Document(doc_path)
@@ -250,7 +219,7 @@ def replace_section_with_text(title: str, new_text: str, doc_path: str= '.src/re
                 del doc.paragraphs[section_start + 1]
                 
             # Insert new text
-            new_paragraphs = new_text.split("\n")
+            new_paragraphs = formatted_text.split("\n")
             for new_para in new_paragraphs:
                 doc.paragraphs[section_start].insert_paragraph_before(new_para)
             del doc.paragraphs[section_start]  # Remove the old title paragraph as the new ones include the title
@@ -263,86 +232,6 @@ def replace_section_with_text(title: str, new_text: str, doc_path: str= '.src/re
 
     except Exception as e:
         print(f"An error occurred while processing the .docx file: {e}")
-
-# # Example usage
-# doc_path = ".src/result/result.docx"
-# title_to_search = "Introduction"
-# new_section_text = """
-# This is the new content to replace the section.
-# You can add multiple paragraphs as needed.
-# """
-# replace_section_with_text(doc_path, title_to_search, new_section_text)
-
-# @file_writer_agent.register_for_execution()
-# @file_writer_agent.register_for_llm(description="Converts markdown content to a .docx file with appropriate headers and text formatting.")
-# def markdown_to_docx(markdown_text: str, doc_path: str) -> None:
-#     """
-#     Converts markdown content to a .docx file with appropriate headers and text formatting.
-
-#     :param markdown_text: The raw text containing markdown elements.
-#     :param doc_path: The path to save the generated .docx file.
-#     :return: None
-#     """
-#     try:
-#         # Convert markdown to HTML
-#         html = markdown(markdown_text)
-        
-#         # Parse HTML using BeautifulSoup
-#         soup = BeautifulSoup(html, 'html.parser')
-        
-#         # Create a new Document
-#         doc = Document()
-        
-#         # Define mapping for header tags
-#         header_map = {
-#             'h1': 'Heading 1',
-#             'h2': 'Heading 2',
-#             'h3': 'Heading 3',
-#             'h4': 'Heading 4',
-#             'h5': 'Heading 5',
-#             'h6': 'Heading 6'
-#         }
-        
-#         # Helper function to add text with possible styling
-#         def add_styled_text(p, element):
-#             if element.name == 'strong':
-#                 run = p.add_run(element.text)
-#                 run.bold = True
-#             elif element.name == 'em':
-#                 run = p.add_run(element.text)
-#                 run.italic = True
-#             elif element.name == 'code':
-#                 run = p.add_run(element.text)
-#                 run.font.name = 'Courier New'
-#             else:
-#                 p.add_run(element.text)
-
-#         # Iterate through HTML elements
-#         for tag in soup.contents:
-#             if tag.name in header_map:
-#                 doc.add_heading(tag.text.strip(), level=int(tag.name[-1]))
-#             elif tag.name == 'p':
-#                 p = doc.add_paragraph()
-#                 for child in tag.children:
-#                     add_styled_text(p, child)
-#             elif tag.name == 'ul':
-#                 for li in tag.find_all('li'):
-#                     doc.add_paragraph(li.text.strip(), style='List Bullet')
-#             elif tag.name == 'ol':
-#                 for li in tag.find_all('li'):
-#                     doc.add_paragraph(li.text.strip(), style='List Number')
-#             elif tag.name == 'pre':
-#                 code_block = tag.find('code')
-#                 if code_block:
-#                     doc.add_paragraph(code_block.text, style='Code')
-
-#         # Save the document
-#         doc.save(doc_path)
-#         print(f"Document saved at: {doc_path}")
-
-#     except Exception as e:
-#         print(f"An error occurred while processing the markdown text: {e}")
-
 
 @file_writer_agent.register_for_execution()
 @file_writer_agent.register_for_llm(description="Converts markdown content to a single string with python-docx compatible formatting.")
@@ -455,3 +344,120 @@ def write_markdown_to_docx(markdown_text: str, doc_path: str, save_path: Optiona
 
     except Exception as e:
         print(f"An error occurred while processing the .docx file: {e}")
+
+# # Example usage
+# doc_path = ".src/result/result.docx"
+# title_to_search = "Introduction"
+# new_section_text = """
+# This is the new content to replace the section.
+# You can add multiple paragraphs as needed.
+# """
+# replace_section_with_text(doc_path, title_to_search, new_section_text)
+
+# @file_writer_agent.register_for_execution()
+# @file_writer_agent.register_for_llm(description="Converts markdown content to a .docx file with appropriate headers and text formatting.")
+# def markdown_to_docx(markdown_text: str, doc_path: str) -> None:
+#     """
+#     Converts markdown content to a .docx file with appropriate headers and text formatting.
+
+#     :param markdown_text: The raw text containing markdown elements.
+#     :param doc_path: The path to save the generated .docx file.
+#     :return: None
+#     """
+#     try:
+#         # Convert markdown to HTML
+#         html = markdown(markdown_text)
+        
+#         # Parse HTML using BeautifulSoup
+#         soup = BeautifulSoup(html, 'html.parser')
+        
+#         # Create a new Document
+#         doc = Document()
+        
+#         # Define mapping for header tags
+#         header_map = {
+#             'h1': 'Heading 1',
+#             'h2': 'Heading 2',
+#             'h3': 'Heading 3',
+#             'h4': 'Heading 4',
+#             'h5': 'Heading 5',
+#             'h6': 'Heading 6'
+#         }
+        
+#         # Helper function to add text with possible styling
+#         def add_styled_text(p, element):
+#             if element.name == 'strong':
+#                 run = p.add_run(element.text)
+#                 run.bold = True
+#             elif element.name == 'em':
+#                 run = p.add_run(element.text)
+#                 run.italic = True
+#             elif element.name == 'code':
+#                 run = p.add_run(element.text)
+#                 run.font.name = 'Courier New'
+#             else:
+#                 p.add_run(element.text)
+
+#         # Iterate through HTML elements
+#         for tag in soup.contents:
+#             if tag.name in header_map:
+#                 doc.add_heading(tag.text.strip(), level=int(tag.name[-1]))
+#             elif tag.name == 'p':
+#                 p = doc.add_paragraph()
+#                 for child in tag.children:
+#                     add_styled_text(p, child)
+#             elif tag.name == 'ul':
+#                 for li in tag.find_all('li'):
+#                     doc.add_paragraph(li.text.strip(), style='List Bullet')
+#             elif tag.name == 'ol':
+#                 for li in tag.find_all('li'):
+#                     doc.add_paragraph(li.text.strip(), style='List Number')
+#             elif tag.name == 'pre':
+#                 code_block = tag.find('code')
+#                 if code_block:
+#                     doc.add_paragraph(code_block.text, style='Code')
+
+#         # Save the document
+#         doc.save(doc_path)
+#         print(f"Document saved at: {doc_path}")
+
+#     except Exception as e:
+#         print(f"An error occurred while processing the markdown text: {e}")
+
+
+        
+# @file_writer_agent.register_for_execution()
+# @file_writer_agent.register_for_llm(description="create a docx from plain text with the right format for correctly rendering a docx")
+# def create_docx_from_script(script: str, filename: str = 'result.docx', directory: str = '.src/result') -> None:
+#     """
+#     Creates a .docx file from a given script and saves it to the specified directory.
+
+#     :param script: The text content to be saved in the .docx file.
+#     :param filename: The name of the .docx file to be created. Default is 'result.docx'.
+#     :param directory: The directory where the .docx file will be saved. Default is '.src/result'.
+#     :return: None
+
+#     Example usage
+#     script_text = "
+#     This is an example script that will be saved into the .docx file.
+#     You can add more content here as needed.
+#     "
+#     create_docx_from_script(script_text)
+#     """
+#     # Create directory if it does not exist
+#     if not os.path.exists(directory):
+#         os.makedirs(directory)
+    
+#     # Create a new Document
+#     doc = Document()
+    
+#     # Add the script to the document
+#     doc.add_paragraph(script)
+    
+#     # Construct the full path
+#     full_path = os.path.join(directory, filename)
+    
+#     # Save the document
+#     doc.save(full_path)
+#     print(f"Document saved at: {full_path}")
+

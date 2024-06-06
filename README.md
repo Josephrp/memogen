@@ -1,8 +1,5 @@
 ## Installation
 
-> please note that EasyRealEstate `runs ai models locally` , the first time you install it and run it , it can take much over an hour to start up based on your computing power!
-
->> however subsequent deployments will take much less time !
 
 ### Pre-Installation : Run Docker
 
@@ -29,10 +26,11 @@ you'll need to install Poetry. Poetry is a tool for dependency management and pa
    ```bash
    curl -sSL https://install.python-poetry.org | python -
    ```
+   
   - On MacOS/Linux : 
 
    ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
+   curl -sSL https://install.python-poetry.org | python3 - 
    ```
 
 
