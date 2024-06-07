@@ -421,9 +421,31 @@ class AutoMemoProduction:
     def write_sections(self, markdown_filenames):
         for filename in markdown_filenames:
             file_content = read_markdown_file_to_text(filename)
-            # first_draft = writer.generate_reply(messages=[{"content": file_content, "role": "user"}])
-            result = writer.initiate_chat(review_chats, message=f"{file_content} \n \n Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:",)
-            write_text_to_markdown(result, filename)
+            # Generate the message to initiate the chat
+            message = f"{file_content} \n \n Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"
+
+            # Initiate the chat with the writer agent
+            intermediate_result = writer.initiate_chat(
+                messages=[{"content": message, "role": "user"}],recipient=critic,
+            )
+
+            # Get the draft produced by the writer
+            draft = intermediate_result.get('content', '')
+
+            # Process the draft with the review_chats
+            for review_chat in review_chats:
+                recipient = review_chat["recipient"]
+                review_message = review_chat["message"](
+                    recipient, [intermediate_result], writer, llm_config
+                )
+                review_result = recipient.generate_reply(
+                    messages=[{"content": review_message, "role": "user"}]
+                )
+                # Optionally handle the review result here if necessary
+                # For simplicity, we assume the draft is improved in place
+
+            # Write the (possibly reviewed) draft to markdown
+            write_text_to_markdown(draft, filename)
             logging.info(f"Completed writing section for {filename}")
 
     def combine_sections_to_docx(self, markdown_directory, docx_path):
