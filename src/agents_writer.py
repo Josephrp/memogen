@@ -2,23 +2,24 @@
 
 from autogen import AssistantAgent
 from autogen.cache import Cache
-from autogen.agentchat.contrib.math_user_proxy_agent  import MathUserProxyAgent
+# from autogen.agentchat.contrib.math_user_proxy_agent  import MathUserProxyAgent
+from src.prompts import get_system_messages
 from src.config import llm_config
 import os
 
-from src.prompts import  writer_system_message, critic_system_message, financial_reviewer_system_message, outliner_system_message, quality_system_message, layman_system_message
-
+# Fetch all system messages using the appropriate function
+messages = get_system_messages(audience="general", memo_type="General")
 # -------- Writer
 
 writer = AssistantAgent(
     name="Writer",
-    system_message=writer_system_message,
+    system_message=messages["writer_system_message"],
     llm_config=llm_config,
 )
 
 outliner = AssistantAgent(
     name="Writer",
-    system_message=outliner_system_message,
+    system_message=messages["outliner_system_message"],
     llm_config=llm_config,
 )
 
@@ -28,28 +29,28 @@ critic = AssistantAgent(
     name="Critic",
     is_termination_msg=lambda x: x.get("content", "").find("TERMINATE") >= 0,
     llm_config=llm_config,
-    system_message=critic_system_message,
+    system_message=messages["critic_system_message"],
 )
 
 layman_reviewer = AssistantAgent(
     name="Layman Reviewer",
     description="A reviewer that makes sure a laywoman would fully understand the content provided to her.",
     llm_config=llm_config,
-    system_message=layman_system_message,
+    system_message=messages["layman_system_message"],
 )
 
 financial_reviewer = AssistantAgent(
     name="Financial Reviewer",
     description='A reviewer that makes sure financial justification are credible',
     llm_config=llm_config,
-    system_message=financial_reviewer_system_message,
+    system_message=messages["financial_reviewer_system_message"],
 )
 
 quality_reviewer = AssistantAgent(
     name="Quality Assurance Reviewer",
     description="a reviewer that makes sure that claims are well justified",
     llm_config=llm_config,
-    system_message=quality_system_message,
+    system_message=messages["quality_system_message"],
 )
 
 meta_reviewer = AssistantAgent(
@@ -60,41 +61,6 @@ meta_reviewer = AssistantAgent(
 )
 
 
-def reflection_message(recipient, messages, sender, config):
-    return f'''Review the following content.
-            \n\n {recipient.chat_messages_for_summary(sender)[-1]['content']}'''
-
-review_chats = [
-    {
-     "recipient": layman_reviewer,
-     "message": reflection_message,
-     "summary_method": "reflection_with_llm",
-     "summary_args": {"summary_prompt" :
-        "Return review into as JSON object only:"
-        "{'Reviewer': '', 'Review': ''}. Here Reviewer should be your role",},
-     "max_turns": 1},
-    {
-    "recipient": financial_reviewer, "message": reflection_message,
-     "summary_method": "reflection_with_llm",
-     "summary_args": {"summary_prompt" :
-        "Return review into as JSON object only:"
-        "{'Reviewer': '', 'Review': ''}.",},
-     "max_turns": 1},
-    {"recipient": quality_reviewer, "message": reflection_message,
-     "summary_method": "reflection_with_llm",
-     "summary_args": {"summary_prompt" :
-        "Return review into as JSON object only:"
-        "{'reviewer': '', 'review': ''}",},
-     "max_turns": 1},
-     {"recipient": meta_reviewer,
-      "message": "Aggregrate feedback from all reviewers and give final suggestions on the writing.",
-     "max_turns": 1},
-]
-
-critic.register_nested_chats(
-    review_chats,
-    trigger=writer,
-)
 
 
 # # --------  Math
