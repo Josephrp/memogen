@@ -261,6 +261,29 @@ def parse_markdown(markdown_str, output_folder="./src/result/intermediate_result
     
     return filenames
 
+def read_markdown_file_to_text(file_path):
+    """
+    Reads a markdown file and returns its raw text content.
+
+    Args:
+        file_path (str): The path to the markdown file.
+
+    Returns:
+        str: The raw text content extracted from the markdown file.
+    """
+    # Read the markdown file
+    with open(file_path, 'r', encoding='utf-8') as file:
+        markdown_string = file.read()
+
+    # Convert markdown to HTML
+    html = markdown.markdown(markdown_string)
+    
+    # Use BeautifulSoup to extract text from HTML
+    soup = BeautifulSoup(html, 'html.parser')
+    text = soup.get_text()
+    
+    return text
+
 # --------- User Input
 
 def get_user_inputs():
