@@ -1,22 +1,17 @@
+# src/agents_docx.py
+
 from autogen import AssistantAgent, ConversableAgent, UserProxyAgent
 from autogen.coding import LocalCommandLineCodeExecutor
 from autogen.cache import Cache
-from autogen.agentchat.contrib.math_user_proxy_agent  import MathUserProxyAgent
 from src.config import llm_config
 from docx import Document
 from docx.text.paragraph import Paragraph
-import os
-from typing import Optional, List, Tuple
+from typing import Optional,  Dict, List, Tuple
 from markdown2 import markdown
 from bs4 import BeautifulSoup
 from src.prompts import file_writer_agent_system_message, docx_planner_system_message
-import copy
-import pprint
+import os
 import re
-from typing import Dict, List, Tuple
-
-import autogen
-from autogen.agentchat.contrib.capabilities import transform_messages, transforms
 
 
 # --------  Docx Planner

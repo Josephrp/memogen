@@ -1,3 +1,5 @@
+# src/agents_planner.py
+
 from autogen import AssistantAgent, UserProxyAgent
 from src.config import llm_config
 from src.prompts import overall_planner_system_message
@@ -18,10 +20,10 @@ overall_planner_user = UserProxyAgent(
     human_input_mode="NEVER",
     code_execution_config={
         "use_docker": True
-    },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
+    }, 
 )
 
-def overall_ask_planner(message):
+def overall_task_planner(message):
     overall_planner_user.initiate_chat(overall_planner, message=message)
     # return the last message received from the planner
     return overall_planner_user.last_message()["content"]
@@ -35,7 +37,7 @@ overall_assistant = AssistantAgent(
         "config_list": llm_config,
         "functions": [
             {
-                "name": "overall_ask_planner",
+                "name": "overall_task_planner",
                 "description": "ask planner to: 1. get a plan for finishing a task, 2. verify the execution result of the plan and potentially suggest new plan.",
                 "parameters": {
                     "type": "object",
@@ -62,5 +64,5 @@ overall_user_proxy = UserProxyAgent(
         "work_dir": "./src/codex",
         "use_docker": True,
     },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
-    function_map={"overall_ask_planner": overall_ask_planner},
+    function_map={"overall_task_planner": overall_task_planner},
 )
