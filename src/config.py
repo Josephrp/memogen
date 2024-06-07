@@ -2,7 +2,7 @@
 
 from autogen.cache import Cache
 
-llm_config = {"model": "gpt-4-turbo", "api_key": "sk-proj-Zb3QBEwIi9lsjWRWrfJPT3BlbkFJMZnaXZDAvolaJHG2n5J2" }
+llm_config = {"model": "gpt-4o", "api_key": "sk-proj-Zb3QBEwIi9lsjWRWrfJPT3BlbkFJMZnaXZDAvolaJHG2n5J2", "max_tokens": 4000 }
 
 import os
 
