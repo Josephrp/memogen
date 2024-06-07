@@ -222,6 +222,45 @@ def process_markdown_files_in_directory(markdown_directory: str = "./src/result/
     doc.save(docx_save_path)
     print(f"Combined document saved at: {docx_save_path}")
 
+def parse_markdown(markdown_str, output_folder="./src/result/intermediate_results"):
+    """
+    Parses a markdown string into several markdown strings divided by titles,
+    then saves each text string as a separate markdown document in a folder.
+
+    Args:
+        markdown_str (str): The markdown content as a string.
+        output_folder (str): The folder to save the numbered markdown files.
+
+    Returns:
+        List of filenames of the created markdown documents.
+    """
+    # Regex pattern to match markdown titles (assuming titles start with #)
+    title_pattern = re.compile(r'(#+\s.*\n)')
+    
+    # Find all titles and their start positions
+    matches = list(title_pattern.finditer(markdown_str))
+    
+    # Ensure the output folder exists
+    os.makedirs(output_folder, exist_ok=True)
+    
+    filenames = []
+    
+    # Iterate over the matches and extract content
+    for i in range(len(matches)):
+        start_pos = matches[i].start()
+        end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(markdown_str)
+        
+        section_str = markdown_str[start_pos:end_pos]
+        
+        # Write the section to a separate markdown file
+        filename = os.path.join(output_folder, f'section_{i + 1}.md')
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(section_str)
+        
+        filenames.append(filename)
+    
+    return filenames
+
 # --------- User Input
 
 def get_user_inputs():
@@ -347,8 +386,7 @@ class AutoMemoProduction:
 
     def create_outline(self):
         message=f"Create an outline for a {self.memo_type} memo on the topic {self.topic} optimized for the audience: {self.audience}."
-        outliner.generate_reply(messages=[{"content": message, "role": "user"}])
-        outline = outliner.last_message().get("content", "")
+        outline =outliner.generate_reply(messages=[{"content": message, "role": "user"}])
         logging.info(f"Outline created: {outline}")
         return outline
 
