@@ -6,32 +6,91 @@ from src.config import llm_config
 from docx import Document
 from docx.text.paragraph import Paragraph
 import os
-from typing import Optional, List, Tuple
+from typing import Optional, Dict, List, Tuple
 from markdown2 import markdown
 from bs4 import BeautifulSoup
-from src.prompts import file_writer_agent_system_message, writer_system_message, critic_system_message, financial_reviewer_system_message, outliner_system_message, quality_system_message, layman_system_message, planner_system_message
-import copy
-import pprint
+from src.prompts import file_writer_agent_system_message, markdown_planner_system_message
+from src.agents_docx import markdown_to_docx_format
 import re
-from typing import Dict, List, Tuple
 
-import autogen
-from autogen.agentchat.contrib.capabilities import transform_messages, transforms
+
+# --------  Markdown Planner
+
+markdown_planner = AssistantAgent(
+    name="markdown_planner",
+    llm_config=llm_config,
+    # the default system message of the AssistantAgent is overwritten here
+    system_message=markdown_planner_system_message,
+)
+
+markdown_planner_user = UserProxyAgent(
+    name="markdown_planner_user",
+    max_consecutive_auto_reply=0,  # terminate without auto-reply
+    human_input_mode="NEVER",
+    code_execution_config={
+        "use_docker": False
+    },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
+)
+
+def markdown_ask_planner(message):
+    markdown_planner_user.initiate_chat(markdown_planner, message=message)
+    # return the last message received from the planner
+    return markdown_planner_user.last_message()["content"]
+
+markdown_assistant = AssistantAgent(
+    name="assistant",
+    llm_config={
+        "temperature": 0,
+        "timeout": 600,
+        "cache_seed": 42,
+        "config_list": llm_config,
+        "functions": [
+            {
+                "name": "markdown_ask_planner",
+                "description": "ask planner to: 1. get a plan for finishing a task, 2. verify the execution result of the plan and potentially suggest new plan.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "message": {
+                            "type": "string",
+                            "description": "question to ask planner. Make sure the question include enough context, such as the code and the execution result. The planner does not know the conversation between you and the user, unless you share the conversation with the planner.",
+                        },
+                    },
+                    "required": ["message"],
+                },
+            },
+        ],
+    },
+)
+
+# create a UserProxyAgent instance named "user_proxy"
+user_proxy = UserProxyAgent(
+    name="markdown_user_proxy",
+    human_input_mode="TERMINATE",
+    max_consecutive_auto_reply=10,
+    # is_termination_msg=lambda x: "content" in x and x["content"] is not None and x["content"].rstrip().endswith("TERMINATE"),
+    code_execution_config={
+        "work_dir": "./src/codex",
+        "use_docker": True,
+    },  # Please set use_docker=True if docker is available to run the generated code. Using docker is safer than running the generated code directly.
+    function_map={"markdown_ask_planner": markdown_ask_planner},
+)
+
 
 
 # -------- CODEX
 
-executor = LocalCommandLineCodeExecutor(
+markdown_executor = LocalCommandLineCodeExecutor(
     timeout=3600,
     work_dir="./src/codex",
 )
 
 
-mardown_file_writer_agent = ConversableAgent(
+markdown_file_writer_agent = ConversableAgent(
     name="file_writer_agent",
     system_message = file_writer_agent_system_message,
     llm_config=llm_config,
-    code_execution_config={"executor": executor},
+    code_execution_config={"executor": markdown_executor},
     human_input_mode="NEVER",
     default_auto_reply=
     "Please continue. If everything is done, reply 'TERMINATE'.",
@@ -40,8 +99,8 @@ mardown_file_writer_agent = ConversableAgent(
 
 # --------  Tools
 
-@file_writer_agent.register_for_execution()
-@file_writer_agent.register_for_llm(description="Writes a text string to a markdown file")
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Writes a text string to a markdown file")
 def write_text_to_markdown(text, file_name, directory='./src/result/intermediate_results'):
     """
     Writes a text string to a markdown file, ensuring the directory exists.
@@ -63,8 +122,8 @@ def write_text_to_markdown(text, file_name, directory='./src/result/intermediate
     
     print(f'Text has been written to {file_path}')
 
-@file_writer_agent.register_for_execution()
-@file_writer_agent.register_for_llm(description="Parses a markdown string into several markdown strings divided by titles, then saves each text string as a separate markdown document in a folder.")
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Parses a markdown string into several markdown strings divided by titles, then saves each text string as a separate markdown document in a folder.")
 def parse_markdown(markdown_str, output_folder="./src/result/intermediate_results"):
     """
     Parses a markdown string into several markdown strings divided by titles,
@@ -104,8 +163,8 @@ def parse_markdown(markdown_str, output_folder="./src/result/intermediate_result
     
     return filenames
 
-@file_writer_agent.register_for_execution()
-@file_writer_agent.register_for_llm(description="Reads a markdown file and returns its raw text content.")
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Reads a markdown file and returns its raw text content.")
 def read_markdown_file_to_text(file_path):
     """
     Reads a markdown file and returns its raw text content.
@@ -129,8 +188,8 @@ def read_markdown_file_to_text(file_path):
     
     return text
 
-@file_writer_agent.register_for_execution()
-@file_writer_agent.register_for_llm(description="Appends text to the end of a given title in a .docx file (before the next title) and saves the updated document.")
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Appends text to the end of a given title in a .docx file (before the next title) and saves the updated document.")
 def append_text_to_title( title: str, text_to_append: str, doc_path: str= '.src/result/result.docx', save_path: Optional[str] = None ) -> None:
     """
     Converts markdown to .docx and appends text to the end of a given title in a .docx file (before the next title) and saves the updated document.
@@ -142,7 +201,11 @@ def append_text_to_title( title: str, text_to_append: str, doc_path: str= '.src/
     try:
         # Convert markdown text to Docx-suitable format
         formatted_text = markdown_to_docx_format(text_to_append)
-     
+    
+    except Exception as e:
+        print(f"An error occurred while converting markdown to docx format: {e}")
+        return ""    
+    
     try:
         # Load the Document
         doc = Document(doc_path)
@@ -184,8 +247,8 @@ def append_text_to_title( title: str, text_to_append: str, doc_path: str= '.src/
 # text_to_append = "This is the appended text."
 # append_text_to_title(doc_path, title_to_search, text_to_append)
 
-@file_writer_agent.register_for_execution()
-@file_writer_agent.register_for_llm(description="Replaces the text between the specified title and the next title in a .docx file with new text.")
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Replaces the text between the specified title and the next title in a .docx file with new text.")
 def replace_section_with_text(title: str, new_text: str, doc_path: str= '.src/result/result.docx',  save_path: Optional[str] = None) -> None:
     """
     Converts Markdown text and Replaces the text between the specified title and the next title in a .docx file with new text.
@@ -199,7 +262,11 @@ def replace_section_with_text(title: str, new_text: str, doc_path: str= '.src/re
     try:
         # Convert markdown text to Docx-suitable format
         formatted_text = markdown_to_docx_format(new_text)
-     
+    
+    except Exception as e:
+        print(f"An error occurred while converting markdown to docx format: {e}")
+        return ""  
+         
     try:
         # Load the Document
         doc = Document(doc_path)
@@ -240,6 +307,8 @@ def replace_section_with_text(title: str, new_text: str, doc_path: str= '.src/re
     except Exception as e:
         print(f"An error occurred while processing the .docx file: {e}")
 
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Opens a markdown file from a directory, replaces specified text, and saves/overrides the file.")
 def replace_specific_text_in_markdown(file_name: str, old_text: str, new_text: str , markdown_directory: str = "./src/result/intermediate_results"):
     """
     Opens a markdown file from a directory, replaces specified text, and saves/overrides the file.
@@ -273,6 +342,8 @@ def replace_specific_text_in_markdown(file_name: str, old_text: str, new_text: s
 
     print(f"Replaced text in {file_path} and saved the updated file.")
 
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Opens a markdown file from a directory, replaces all text with new text, and saves/overrides the file.")
 def replace_all_text_in_markdown(markdown_directory: str, file_name: str, new_text: str):
     """
     Opens a markdown file from a directory, replaces all text with new text, and saves/overrides the file.
@@ -298,6 +369,8 @@ def replace_all_text_in_markdown(markdown_directory: str, file_name: str, new_te
 
     print(f"Replaced all text in {file_path} and saved the updated file.")
 
+@markdown_file_writer_agent.register_for_execution()
+@markdown_file_writer_agent.register_for_llm(description="Opens a markdown file from a directory, finds a given title, and replaces all text until the next title or subtitle with the text provided, then saves/overrides the file.")
 def replace_section_in_markdown(file_name: str, title: str, new_text: str, markdown_directory: str = ".src/result/intermediate_results"):
     """
     Opens a markdown file from a directory, finds a given title, and replaces all text

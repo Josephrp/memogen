@@ -1,5 +1,9 @@
 import autogen
-from src.agents import file_writer_agent, layman_reviewer, financial_reviewer, quality_reviewer , outliner,  meta_reviewer, critic, writer, planner_user, planner, user_proxy
+from src.agents_writer import file_writer_agent, layman_reviewer, financial_reviewer, quality_reviewer , outliner,  meta_reviewer, critic, writer
+from src.agents_docx import docx_planner, docx_planner_user, docx_file_writer_agent, docx_user_proxy
+from src.agents_markdown import markdown_assistant, markdown_file_writer_agent, markdown_planner, markdown_planner_user
+from src.agents_planner import overall_assistant, overall_planner, overall_planner_user, overall_user_proxy
+
 from src.config import load_env_file
 from autogen.graph_utils import visualize_speaker_transitions_dict
 
