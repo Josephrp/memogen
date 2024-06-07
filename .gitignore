@@ -2,6 +2,10 @@
 
 /src/agents.py 
 
+# config files with keys
+
+/src/OAI_CONFIG_LIST.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

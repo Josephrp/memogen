@@ -7,6 +7,7 @@ from docx.text.paragraph import Paragraph
 from typing import Optional,  Dict, List, Tuple
 import re
 import os
+import json
 
 def write_text_to_markdown(text, file_name, directory='./src/result/intermediate_results'):
     """
@@ -20,9 +21,17 @@ def write_text_to_markdown(text, file_name, directory='./src/result/intermediate
     # Ensure the directory exists
     os.makedirs(directory, exist_ok=True)
     
+      
+    # Ensure the file_name does not contain any path segments  
+    file_name = os.path.basename(file_name)  
+  
     # Full path to the markdown file
     file_path = os.path.join(directory, file_name)
-    
+
+    # Convert text to string if it's a dictionary  
+    if isinstance(text, dict):  
+        text = json.dumps(text, indent=4)  # Pretty-print the JSON with indentation  
+  
     # Write the text content to the markdown file
     with open(file_path, 'w', encoding='utf-8') as file:
         file.write(text)
@@ -141,64 +150,61 @@ def write_markdown_to_docx(markdown_text: str, save_path: Optional[str] = "./src
         print(f"An error occurred while converting markdown to docx format: {e}")
         return ""
 
-def process_markdown_files_in_directory(markdown_directory: str = "./src/result/intermediate_results", docx_save_path: str = "./src/result/result.docx"):
-    """
-    Iterates over each markdown file in a directory and writes them to a .docx file.
-
-    Args:
-        markdown_directory (str): The directory containing markdown files.
-        docx_save_path (str): The path to save the combined .docx file.
-
-    Returns:
-        None
-    """
-    # Ensure the markdown directory exists
-    if not os.path.isdir(markdown_directory):
-        raise ValueError(f"The specified directory does not exist: {markdown_directory}")
-
-    # Create a new Document or load an existing one
-    if os.path.exists(docx_save_path):
-        doc = Document(docx_save_path)
-    else:
-        doc = Document()
-
-    # Iterate over each markdown file in the directory
-    for filename in os.listdir(markdown_directory):
-        if filename.endswith('.md'):
-            filepath = os.path.join(markdown_directory, filename)
-
-            # Read the markdown file content
-            with open(filepath, 'r', encoding='utf-8') as file:
-                markdown_text = file.read()
-
-            # Convert markdown text to docx format and append it to the document
-            formatted_text = markdown_to_docx_format(markdown_text)
-            paragraphs = formatted_text.split('\n\n')
-
-            for paragraph in paragraphs:
-                if ': ' in paragraph:
-                    # Check for headers
-                    header_type, text = paragraph.split(': ', 1)
-                    doc.add_heading(text.strip(), level=int(header_type[-1]))
-                elif paragraph.startswith('```') and paragraph.endswith('```'):
-                    # Check for code blocks
-                    code_text = paragraph.strip('```').strip()
-                    doc.add_paragraph(code_text, style='Quote')
-                else:
-                    # Handle bullet points and other text
-                    lines = paragraph.split('\n')
-                    for line in lines:
-                        if line.startswith('- '):
-                            doc.add_paragraph(line.strip('- '), style='List Bullet')
-                        elif line.startswith('1. '):
-                            doc.add_paragraph(line.strip('1. '), style='List Number')
-                        else:
-                            doc.add_paragraph(line)
-
-    # Save the combined document
-    doc.save(docx_save_path)
-    print(f"Combined document saved at: {docx_save_path}")
-
+def process_markdown_files_in_directory(markdown_directory: str = "./src/result/intermediate_results", docx_save_path: str = "./src/result/result.docx"):  
+    """  
+    Iterates over each markdown file in a directory and writes them to a .docx file.  
+    Args:  
+        markdown_directory (str): The directory containing markdown files.  
+        docx_save_path (str): The path to save the combined .docx file.  
+    Returns:  
+        None  
+    """  
+    # Ensure the markdown directory exists  
+    if not os.path.isdir(markdown_directory):  
+        raise ValueError(f"The specified directory does not exist: {markdown_directory}")  
+    # Create a new Document or load an existing one  
+    if os.path.exists(docx_save_path):  
+        doc = Document(docx_save_path)  
+    else:  
+        doc = Document()  
+    # Iterate over each markdown file in the directory  
+    for filename in os.listdir(markdown_directory):  
+        if filename.endswith('.md'):  
+            filepath = os.path.join(markdown_directory, filename)  
+            # Read the markdown file content  
+            with open(filepath, 'r', encoding='utf-8') as file:  
+                markdown_text = file.read()  
+            # Convert markdown text to docx format and append it to the document  
+            formatted_text = markdown_to_docx_format(markdown_text)  
+            paragraphs = formatted_text.split('\n\n')  
+            for paragraph in paragraphs:  
+                if ': ' in paragraph:  
+                    try:  
+                        # Check for headers  
+                        header_type, text = paragraph.split(': ', 1)  
+                        level = int(''.join(filter(str.isdigit, header_type)))  
+                        doc.add_heading(text.strip(), level=level)  
+                    except ValueError as ve:  
+                        print(f"Header parsing error: {ve}, Paragraph: {paragraph}")  
+                        doc.add_paragraph(paragraph)  
+                elif paragraph.startswith('```') and paragraph.endswith('```'):  
+                    # Check for code blocks  
+                    code_text = paragraph.strip('```').strip()  
+                    doc.add_paragraph(code_text, style='Quote')  
+                else:  
+                    # Handle bullet points and other text  
+                    lines = paragraph.split('\n')  
+                    for line in lines:  
+                        if line.startswith('- '):  
+                            doc.add_paragraph(line.strip('- '), style='List Bullet')  
+                        elif line.startswith('1. '):  
+                            doc.add_paragraph(line.strip('1. '), style='List Number')  
+                        else:  
+                            doc.add_paragraph(line)  
+    # Save the combined document  
+    doc.save(docx_save_path)  
+    print(f"Combined document saved at: {docx_save_path}")  
+    
 def parse_markdown(markdown_str, output_folder="./src/result/intermediate_results"):
     """
     Parses a markdown string into several markdown strings divided by titles,

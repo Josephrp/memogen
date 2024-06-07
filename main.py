@@ -107,8 +107,7 @@ meta_reviewer = AssistantAgent(
 # --------- Main Application Logic
 
 def reflection_message(recipient, messages, sender, config):
-    return f'''Review the following content.
-            \n\n {recipient.chat_messages_for_summary(sender)[-1]['content']}'''
+    return f'''Review the following content. \n\n {recipient.chat_messages_for_summary(sender)[-1]['content']}'''
 
 review_chats = [
     {
@@ -190,13 +189,18 @@ class AutoMemoProduction:
             manager = GroupChatManager(groupchat=groupchat, llm_config=llm_config)  
             
             # Start chat with writer  
-            writer.initiate_chat(manager, message=message)  
+            writer.initiate_chat(manager, message=message)   
             
-            # Execute the chat  
-            result = manager.run_chat()  
+            # Execute the chat 
+                # Retrieve the last message from the writer  
+            messages_from_writer = [message for message in groupchat.messages if message['sender'] == writer]  
+            msg_content = messages_from_writer[-1]['content'] if messages_from_writer else None  
+       
+            # msg_content = groupchat.messages(writer)[-1]['content']
+            # msg_content = groupchat.messages(writer)[-1]['content']
             
             # Write the (possibly reviewed) draft to markdown  
-            write_text_to_markdown(result["messages"][-1]["content"], filename)  
+            write_text_to_markdown(msg_content, filename)  
             logging.info(f"Completed writing section for {filename}")  
     
 
