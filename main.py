@@ -276,7 +276,7 @@ def read_markdown_file_to_text(file_path):
         markdown_string = file.read()
 
     # Convert markdown to HTML
-    html = markdown.markdown(markdown_string)
+    html = markdown(markdown_string)
     
     # Use BeautifulSoup to extract text from HTML
     soup = BeautifulSoup(html, 'html.parser')
