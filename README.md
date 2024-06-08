@@ -64,8 +64,8 @@ you'll need to install Poetry. Poetry is a tool for dependency management and pa
    Clone the repository to a local machine:
 
    ```sh
-   git clone https://github.com/Josephrp/AutoFinMemo
-   cd AutoFinMemo
+   git clone https://github.com/Josephrp/memogen
+   cd memogen
    ```
 
 2. **Set your OpenAI API Key**
