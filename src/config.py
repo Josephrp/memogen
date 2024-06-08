@@ -10,10 +10,10 @@ import os
 filter_criteria = {"model": ["gptonic"]}
 
 llm_config =     {
-        "model": "gptonic",
-        "api_key": "your_key_here",
-        "base_url": "https://eastus2.api.cognitive.microsoft.com/",
+        "model": "your_deployment_name", # mine is "tonicgpt"
+        "api_key": "your_api_key_here",
+        "base_url": "your_url_here", # https://eastus2.api.cognitive.microsoft.com/
         "api_type": "azure",
-        "api_version": "date-version",
-        "max_tokens": 1600
+        "api_version": "date_version", # eg "2024-02-01" for gpt-4o
+        "max_tokens": 1600 # change this according to your needs
     }

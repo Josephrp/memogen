@@ -69,7 +69,9 @@ def markdown_to_docx_format(markdown_text: str) -> str:
     :param markdown_text: The raw text containing markdown elements.  
     :return: A single string with the complete text, formatted for further processing.  
     """  
-    try:  
+    try:
+        # Remove ```markdown ... ``` and ``` code blocks from the input text using regex  
+        markdown_text = re.sub(r'```.*?```', '', markdown_text, flags=re.DOTALL)    
         # Convert markdown to HTML  
         html = markdown(markdown_text)  
         # Parse HTML using BeautifulSoup  

@@ -1,7 +1,33 @@
-## Installation
+# MemoGen  
+   
+MemoGen is an advanced application that allows users to generate high-quality memos of various types through a fully automated process. Utilizing state-of-the-art AI-driven components, MemoGen handles the writing, outlining, and reviewing of memos. The final output is a detailed and well-structured document in DOCX format.  
+   
+## Features  
+   
+- **Automated Memo Creation:** Generates memos with minimal user input.  
+- **Multi-Agent Review System:** Ensures quality through multiple AI reviewers.  
+- **Supports Various Memo Types:** Accounting, Financial, Technical, Policy, and more.  
+- **DOCX Output:** Final document is saved in a widely used format.  
+- **Self-Reflection:** Built-in quality control mechanisms for continuous improvement.  
+- **MIT Licensed:** Open and accessible for modification.  
 
+## How It Works  
+   
+MemoGen uses a combination of language models and AI-driven review agents to produce high-quality memos. Here's an overview of the process:  
+   
+1. **User Input:** The user provides the topic, audience, and type of memo.  
+2. **Outline Creation:** An outline for the memo is generated based on the provided inputs.  
+3. **Section Writing:** Each section of the memo is written with the help of multiple AI agents.  
+4. **Review and Reflection:** The content goes through a review process by different reviewers, ensuring the final output is polished and accurate.  
+5. **Document Compilation:** The individual sections are combined into a final DOCX document, ready for download.  
+   
+## How to Use  
 
-### Pre-Installation : Run Docker
+**🌟STAR and 🍴FORK this Repository, then follow the instructions below exactly.**
+
+### Installation
+
+#### Pre-Installation : Run Docker
 
 - install and run `Docker` if it's not already there on startup by [following these instructions](https://docs.docker.com/engine/install/)
 
@@ -12,7 +38,7 @@
   - on Linux : 
     - [follow these instructions](https://docs.docker.com/engine/install/linux-postinstall/)
 
-### Pre-Installation : Install Poetry
+#### Pre-Installation : Install Poetry
 
 you'll need to install Poetry. Poetry is a tool for dependency management and packaging in Python. It ensures that you have a consistent environment across different setups.
 
@@ -32,11 +58,6 @@ you'll need to install Poetry. Poetry is a tool for dependency management and pa
    ```bash
    curl -sSL https://install.python-poetry.org | python3 - 
    ```
-
-
-### Installation Instructions
-
->> 🌟STAR and 🍴FORK this Repository, then follow the instructions below exactly.
 
 1. **Clone the Repository**
 
@@ -88,8 +109,7 @@ currently we're providing two ways to plug in your llm:
       poetry run python main.py
       ```
 
-
-### Troubleshooting
+#### Troubleshooting
 
 If you encounter any issues during installation, refer to the [Poetry documentation](https://python-poetry.org/docs/#installation) for detailed guidance and troubleshooting tips.
 
@@ -106,3 +126,53 @@ If you encounter any issues during installation, refer to the [Poetry documentat
    ```bash
    source ~/.bashrc  # or `source ~/.zshrc` depending on your shell
    ```
+
+
+## Contributing  
+
+Thank you for considering contributing to MemoGen! We welcome all types of contributions, whether it's bug reports, feature suggestions, or code improvements.  
+  
+### How to Contribute  
+   
+1. **Fork the Repository:**  
+   - Navigate to our GitLab repository: [MemoGen on GitLab](https://git.tonic-ai.com/positonic/memogen/memogen).  
+   - Click on the "Fork" button to create your own copy of the repository.  
+   - Please read the [CONTRIBUTING.md](CONTRIBUTING.md) and our our [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) and the process for submitting pull/merge requests.
+
+## Project Structure  
+   
+```  
+memogen/  
+├── src/  
+│   ├── agents_writer.py  
+│   ├── config/  
+│   │   └── llm_config.py  
+│   ├── main.py  
+│   ├── prompts.py  
+│   ├── result/  
+│   │   └── intermediate_results/  
+│   ├── utils.py  
+└── requirements.txt  
+```
+
+### License  
+   
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.  
+
+### Acknowledgements  
+   
+We would like to acknowledge the use of the following tools and libraries:  
+- [AutoGen](https://github.com/AutoGenAI/autogen)  
+- [Logging](https://docs.python.org/3/library/logging.html)  
+
+### Contact  
+   
+For any questions or suggestions, please open an issue.  
+   
+---  
+
+### License  
+   
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.  
+      
+By using MemoGen, you agree to the terms specified in the MIT License. Enjoy your automated memo creation experience!
