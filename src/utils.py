@@ -124,7 +124,12 @@ def write_markdown_to_docx(markdown_text: str, save_path: Optional[str] = "./src
             if ': ' in paragraph:
                 # Check for headers
                 header_type, text = paragraph.split(': ', 1)
-                doc.add_heading(text.strip(), level=header_type[-1])
+                try:  
+                    level = int(''.join(filter(str.isdigit, header_type)))  
+                    doc.add_heading(text.strip(), level=level)  
+                except ValueError as ve:  
+                    print(f"Header parsing error: {ve}, Paragraph: {paragraph}")  
+                    doc.add_paragraph(paragraph)  
             elif paragraph.startswith('```') and paragraph.endswith('```'):
                 # Check for code blocks
                 code_text = paragraph.strip('```').strip()
@@ -134,9 +139,9 @@ def write_markdown_to_docx(markdown_text: str, save_path: Optional[str] = "./src
                 lines = paragraph.split('\n')
                 for line in lines:
                     if line.startswith('- '):
-                        doc.add_paragraph(line.strip('- '), style='List Bullet')
+                        doc.add_paragraph(line.strip('- '), style='ListBullet')
                     elif line.startswith('1. '):
-                        doc.add_paragraph(line.strip('1. '), style='List Number')
+                        doc.add_paragraph(line.strip('1. '), style='ListNumber')
                     else:
                         doc.add_paragraph(line)
 
@@ -196,15 +201,15 @@ def process_markdown_files_in_directory(markdown_directory: str = "./src/result/
                     lines = paragraph.split('\n')  
                     for line in lines:  
                         if line.startswith('- '):  
-                            doc.add_paragraph(line.strip('- '), style='List Bullet')  
+                            doc.add_paragraph(line.strip('- '), style='ListBullet')  
                         elif line.startswith('1. '):  
-                            doc.add_paragraph(line.strip('1. '), style='List Number')  
+                            doc.add_paragraph(line.strip('1. '), style='ListNumber')  
                         else:  
                             doc.add_paragraph(line)  
     # Save the combined document  
     doc.save(docx_save_path)  
     print(f"Combined document saved at: {docx_save_path}")  
-    
+
 def parse_markdown(markdown_str, output_folder="./src/result/intermediate_results"):
     """
     Parses a markdown string into several markdown strings divided by titles,

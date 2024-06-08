@@ -26,7 +26,7 @@ you'll need to install Poetry. Poetry is a tool for dependency management and pa
    ```bash
    curl -sSL https://install.python-poetry.org | python -
    ```
-   
+
   - On MacOS/Linux : 
 
    ```bash
@@ -49,9 +49,30 @@ you'll need to install Poetry. Poetry is a tool for dependency management and pa
 
 2. **Set your OpenAI API Key**
 
-- edit the `./src/config/config.py` file using a text editor and replace your api_key_here with your api key (keep the quotes!)
+currently we're providing two ways to plug in your llm:
 
-  `llm_config = {"model": "gpt-4-turbo", "api_key": "your_api_key_here" }`
+**Using Open AI :**
+    - edit the `./src/config/config.py` file using a text editor and replace your api_key_here with your api key (keep the quotes!)
+
+`llm_config = {"model": "gpt-4-turbo", "api_key": "your_api_key_here" }`
+
+**Using Azure:**
+    - edit the `./src/OAI_CONFIG_LIST.json.example` file using a text editor and save it as `OAI_CONFIG_LIST.json` (without the `.example`at the end !)
+
+```json
+[
+    {
+        "model": "deployment_name",
+        "api_key": "your_api_key_here",
+        "base_url": "https://eastus2.api.cognitive.microsoft.com/",
+        "api_type": "azure",
+        "api_version": "2024-02-01"
+    }
+]
+```
+
+**In both cases:**
+    - make sure you ["comment out"](https://www.datacamp.com/tutorial/python-block-comment) the method you are **not** using in `./src/config/config.py` !
 
 3. **Install and Run**
 
@@ -61,7 +82,7 @@ you'll need to install Poetry. Poetry is a tool for dependency management and pa
       poetry install
       ```
 
-      then : 
+      then :
 
       ```sh
       poetry run python main.py

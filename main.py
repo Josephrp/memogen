@@ -3,18 +3,14 @@
 import autogen
 from autogen import GroupChat, GroupChatManager
 from src.agents_writer import layman_reviewer, financial_reviewer, quality_reviewer , outliner,  meta_reviewer, critic, writer
-# from src.agents_docx import  process_markdown_files_in_directory
-# from src.agents_markdown import  parse_markdown, read_markdown_file_to_text, write_text_to_markdown
-from src.config import load_env_file
 from src.utils import parse_markdown, process_markdown_files_in_directory, read_markdown_file_to_text, write_text_to_markdown
-# from autogen.agentchat.groupchat import GroupChat
 from autogen import initiate_chats
 from autogen.cache import Cache
 from src.config import llm_config
 import logging
 import os
 import re
-
+from autogen.agentchat.conversable_agent import initiate_chats
 # ---------- Init
 
 
@@ -174,34 +170,91 @@ class AutoMemoProduction:
             else:  
                 return "random"  
     
-        for filename in markdown_filenames:  
-            file_content = read_markdown_file_to_text(filename)  
-            message = f"{file_content} \n \n Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+        # for filename in markdown_filenames:  
+        for index, filename in enumerate(markdown_filenames):  
+            current_content = read_markdown_file_to_text(filename)  
             
+            # Read previous section  
+            previous_content = ""  
+            if index > 0:  
+                previous_filename = markdown_filenames[index - 1]  
+                previous_content = read_markdown_file_to_text(previous_filename)  
+            
+            # Read next section  
+            next_content = ""  
+            if index < len(markdown_filenames) - 1:  
+                next_filename = markdown_filenames[index + 1]  
+                next_content = read_markdown_file_to_text(next_filename)  
+            
+            # Construct message based on position in the list  
+            if index == 0:  
+                # First section  
+                message = (  
+                    f"NEXT SECTION:\n\n"  
+                    f"{next_content}\n\n"
+                    f"---\n\n"   
+                    f"FOCUS SECTION :\n\n"  
+                    f"{current_content}\n\n"    
+                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+                )  
+            elif index == len(markdown_filenames) - 1:  
+                # Last section  
+                message = (  
+                    f"PREVIOUS SECTION:\n\n"  
+                    f"{previous_content}\n\n"  
+                    f"---\n\n"  
+                    f"FOCUS SECTION :\n\n"  
+                    f"{current_content}\n\n"  
+                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+                )  
+            else:  
+                # Middle sections  
+                message = (
+                    f"PREVIOUS SECTION:\n\n"    
+                    f"{previous_content}\n\n"  
+                    f"---\n\n"
+                    f"NEXT SECTION:\n\n"  
+                    f"{next_content}\n\n"  
+                    f"---\n\n"  
+                    f"FOCUS SECTION :\n\n"    
+                    f"{current_content}\n\n"  
+                    f"---\n\n"  
+                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+                )  
+                      
             # Initialize GroupChat  
             groupchat = GroupChat(  
                 agents=[writer, critic, layman_reviewer, financial_reviewer, quality_reviewer, meta_reviewer],  
                 messages=[],  
-                max_round=4,  
+                max_round=2,  
                 speaker_selection_method=custom_speaker_selection_func,  
             )  
             
             manager = GroupChatManager(groupchat=groupchat, llm_config=llm_config)  
-            
             # Start chat with writer  
-            writer.initiate_chat(manager, message=message)   
+            result = writer.initiate_chat(manager, message=message)  
             
-            # Execute the chat 
-                # Retrieve the last message from the writer  
-            messages_from_writer = [message for message in groupchat.messages if message['sender'] == writer]  
-            msg_content = messages_from_writer[-1]['content'] if messages_from_writer else None  
-       
-            # msg_content = groupchat.messages(writer)[-1]['content']
-            # msg_content = groupchat.messages(writer)[-1]['content']
-            
-            # Write the (possibly reviewed) draft to markdown  
-            write_text_to_markdown(msg_content, filename)  
-            logging.info(f"Completed writing section for {filename}")  
+            try:  
+                # Access the chat history and find the last message from 'Writer'  
+                chat_history = result.chat_history  
+                if chat_history:  
+                    last_message = None  
+                    for entry in reversed(chat_history):  
+                        if entry.get("sender") == writer.name:  
+                            last_message = entry.get("content")  
+                            break  
+                    
+                    if last_message:  
+                        write_text_to_markdown(last_message, filename)  
+                        logging.info(f"Completed writing section for {filename}")  
+                    else:  
+                        logging.error(f"No message from  {writer.name} found in chat history for {filename}")  
+                else:  
+                    logging.error(f"No chat history found in result for {filename}")  
+            except Exception as e:  
+                logging.error(f"Failed to process chat result for {filename}: {e}")  
+            # write_text_to_markdown(result['sender':'Writer']['response'], filename)  
+            # logging.info(f"Completed writing section for {filename}")  
     
 
     def combine_sections_to_docx(self, markdown_directory, docx_path):
@@ -212,7 +265,7 @@ class AutoMemoProduction:
         outline = self.create_outline()
         markdown_filenames = self.parse_outline_to_markdown_chunks(outline)
         self.write_sections(markdown_filenames)
-        self.combine_sections_to_docx("./src/result/intermediate_results", "./src/result/final_memo.docx")
+        self.combine_sections_to_docx("./src/result/intermediate_results", "./src/result/result.docx")
 
 
 if __name__ == "__main__":
