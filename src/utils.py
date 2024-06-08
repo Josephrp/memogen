@@ -28,9 +28,11 @@ def write_text_to_markdown(text, file_name, directory='./src/result/intermediate
     # Full path to the markdown file
     file_path = os.path.join(directory, file_name)
 
-    # Convert text to string if it's a dictionary  
+    # Convert text to string if it's a dictionary or list  
     if isinstance(text, dict):  
         text = json.dumps(text, indent=4)  # Pretty-print the JSON with indentation  
+    elif isinstance(text, list):  
+        text = '\n'.join(text)  # Convert list to a string with each element on a new line  
   
     # Write the text content to the markdown file
     with open(file_path, 'w', encoding='utf-8') as file:

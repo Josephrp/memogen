@@ -195,7 +195,7 @@ class AutoMemoProduction:
                     f"---\n\n"   
                     f"FOCUS SECTION :\n\n"  
                     f"{current_content}\n\n"    
-                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+                    f"Produce a simple and short introduction for this {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
                 )  
             elif index == len(markdown_filenames) - 1:  
                 # Last section  
@@ -233,26 +233,28 @@ class AutoMemoProduction:
             manager = GroupChatManager(groupchat=groupchat, llm_config=llm_config)  
             # Start chat with writer  
             result = writer.initiate_chat(manager, message=message)  
-            
-            try:  
-                # Access the chat history and find the last message from 'Writer'  
-                chat_history = result.chat_history  
-                if chat_history:  
-                    last_message = None  
-                    for entry in reversed(chat_history):  
-                        if entry.get("sender") == writer.name:  
-                            last_message = entry.get("content")  
-                            break  
+            final_message = manager.chat_messages[writer][-1]['content']
+            write_text_to_markdown(final_message, filename)  
+
+            # try:  
+            #     # Access the chat history and find the last message from 'Writer'  
+            #     chat_history = result.chat_history 
+            #     if chat_history:  
+            #         last_message = None  
+            #         for entry in reversed(chat_history):  
+            #             if entry.get("role") == writer.name:  
+            #                 last_message = entry.get("content")  
+            #                 break  
                     
-                    if last_message:  
-                        write_text_to_markdown(last_message, filename)  
-                        logging.info(f"Completed writing section for {filename}")  
-                    else:  
-                        logging.error(f"No message from  {writer.name} found in chat history for {filename}")  
-                else:  
-                    logging.error(f"No chat history found in result for {filename}")  
-            except Exception as e:  
-                logging.error(f"Failed to process chat result for {filename}: {e}")  
+            #         if last_message:  
+            #             write_text_to_markdown(last_message, filename)  
+            #             logging.info(f"Completed writing section for {filename}")  
+            #         else:  
+            #             logging.error(f"No message from  {writer.name} found in chat history for {filename}")  
+            #     else:  
+            #         logging.error(f"No chat history found in result for {filename}")  
+            # except Exception as e:  
+            #     logging.error(f"Failed to process chat result for {filename}: {e}")  
             # write_text_to_markdown(result['sender':'Writer']['response'], filename)  
             # logging.info(f"Completed writing section for {filename}")  
     
