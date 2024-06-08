@@ -11,9 +11,9 @@ filter_criteria = {"model": ["gptonic"]}
 
 llm_config =     {
         "model": "gptonic",
-        "api_key": "your_api_key_here",
+        "api_key": "your_key_here",
         "base_url": "https://eastus2.api.cognitive.microsoft.com/",
         "api_type": "azure",
-        "api_version": "2024-02-01",
+        "api_version": "date-version",
         "max_tokens": 1600
     }
