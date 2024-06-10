@@ -1,27 +1,31 @@
 # src/main.py
 
-import autogen
 from autogen import GroupChat, GroupChatManager
-from src.agents_writer import layman_reviewer, financial_reviewer, quality_reviewer , outliner,  meta_reviewer, critic, writer
-from src.utils import parse_markdown, process_markdown_files_in_directory, read_markdown_file_to_text, write_text_to_markdown
-from autogen import initiate_chats
-from autogen.cache import Cache
+from src.utils import parse_markdown, markdown_to_docx, read_markdown_file_to_text, write_text_to_markdown, clear_previous_results
 from src.config import llm_config
 import logging
+from autogen.agentchat.contrib.capabilities.teachability import Teachability
+import chromadb
+from autogen import AssistantAgent
+from src.prompts import get_system_messages
+from src.config import llm_config
 import os
+import glob
 import re
-from autogen.agentchat.conversable_agent import initiate_chats
+
+# For Development
+# from autogen.cache import Cache
+
+
 # ---------- Init
-
-
-# load_env_file('/.env')
-
-# chroma_client = chromadb.HttpClient(host='localhost', port=8000)
 
 topic = ""
 audience = ""
 memo_type = ""
 
+# ---------- ChromaDB Init
+
+chroma_client = chromadb.HttpClient(host='localhost', port=8000)
 
 # --------- User Input
 
@@ -41,16 +45,17 @@ def get_user_inputs():
 
 # --------- Agents 
 
-from autogen import AssistantAgent
-from src.prompts import get_system_messages
-from src.config import llm_config
-import os
-
 # Fetch all system messages using the appropriate function
 messages = get_system_messages(audience="general", memo_type="General")
 # -------- Writer
 
 writer = AssistantAgent(
+    name="Writer",
+    system_message=messages["writer_system_message"],
+    llm_config=llm_config,
+)
+
+second_writer = AssistantAgent(
     name="Writer",
     system_message=messages["writer_system_message"],
     llm_config=llm_config,
@@ -99,7 +104,14 @@ meta_reviewer = AssistantAgent(
     "the work of other reviewers and give a final suggestion on the content.",
 )
 
-
+# Instantiate a Teachability object. Its parameters are all optional.
+teachability = Teachability(
+    reset_db=True,  # Use True to force-reset the memo DB, and False to use an existing DB.
+    verbosity=1,
+    recall_threshold=3,
+    llm_config=llm_config,
+    max_num_retrievals=50,
+)
 # --------- Main Application Logic
 
 def reflection_message(recipient, messages, sender, config):
@@ -125,10 +137,10 @@ review_chats = [
      "summary_method": "reflection_with_llm",
      "summary_args": {"summary_prompt" :
         "Return review into as JSON object only:"
-        "{'reviewer': '', 'review': ''}",},
+        "{'Reviewer': '', 'Review': ''}",},
      "max_turns": 1},
      {"recipient": meta_reviewer,
-      "message": "Aggregrate feedback from all reviewers and give final suggestions on the writing.",
+      "message": "Aggregrate feedback from all reviewers and give final suggestions on the writing. NEVER suggest to improve the memo section based on additional sections or more information that would be contained in other different sections.  Make sure your suggestion is concise (within 3 bullet points), concrete and to the point.  ALWAYS offer suggestion that supports the deduplication of the writer's content for the current and future sections based on the previous sections.",
      "max_turns": 1},
 ]
 
@@ -136,7 +148,10 @@ critic.register_nested_chats(
     review_chats,
     trigger=writer,
 )
-
+# Now add teachability to the agent.
+teachability.add_to_agent(critic)
+teachability.add_to_agent(meta_reviewer)
+# teachability.add_to_agent(writer)
 
 class AutoMemoProduction:
     def __init__(self, topic, audience, memo_type):
@@ -169,59 +184,65 @@ class AutoMemoProduction:
                 return "random" if len(messages) < 3 else meta_reviewer  
             else:  
                 return "random"  
-    
-        # for filename in markdown_filenames:  
+
+
         for index, filename in enumerate(markdown_filenames):  
             current_content = read_markdown_file_to_text(filename)  
-            
-            # Read previous section  
+  
+            # Read all previous sections  
             previous_content = ""  
             if index > 0:  
-                previous_filename = markdown_filenames[index - 1]  
-                previous_content = read_markdown_file_to_text(previous_filename)  
-            
-            # Read next section  
+                previous_content = "\n\n".join(read_markdown_file_to_text(markdown_filenames[i]) for i in range(index))  
+  
+            # Read all next sections  
             next_content = ""  
             if index < len(markdown_filenames) - 1:  
-                next_filename = markdown_filenames[index + 1]  
-                next_content = read_markdown_file_to_text(next_filename)  
-            
+                next_content = "\n\n".join(read_markdown_file_to_text(markdown_filenames[i]) for i in range(index + 1, len(markdown_filenames)))  
+  
             # Construct message based on position in the list  
             if index == 0:  
                 # First section  
-                message = (  
+                message = (
+                    f"AUDIENCE:\n\n"    
+                    fr"{self.audience}\n\n"  
+                    f"---\n\n"  
                     f"NEXT SECTION:\n\n"  
-                    f"{next_content}\n\n"
-                    f"---\n\n"   
+                    f"{next_content}\n\n"  
+                    f"---\n\n"  
                     f"FOCUS SECTION :\n\n"  
-                    f"{current_content}\n\n"    
-                    f"Produce a simple and short introduction for this {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+                    f"{current_content}\n\n"  
+                    f"Produce a simple and short introduction for this {self.memo_type} memo on the topic of {self.topic} optimized for AUDIENCE provided above. ALWAYS deduplicate your content based on the sections provided:"  
                 )  
             elif index == len(markdown_filenames) - 1:  
                 # Last section  
-                message = (  
+                message = (
+                    f"AUDIENCE:\n\n"    
+                    fr"{self.audience}\n\n"  
+                    f"---\n\n"  
                     f"PREVIOUS SECTION:\n\n"  
                     f"{previous_content}\n\n"  
                     f"---\n\n"  
                     f"FOCUS SECTION :\n\n"  
                     f"{current_content}\n\n"  
-                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for AUDIENCE provided above. ALWAYS deduplicate your content based on the sections provided:"  
                 )  
             else:  
                 # Middle sections  
-                message = (
-                    f"PREVIOUS SECTION:\n\n"    
+                message = (                    
+                    f"AUDIENCE:\n\n"    
+                    fr"{self.audience}\n\n"  
+                    f"---\n\n"  
+                    f"PREVIOUS SECTION:\n\n"  
                     f"{previous_content}\n\n"  
-                    f"---\n\n"
+                    f"---\n\n"  
                     f"NEXT SECTION:\n\n"  
                     f"{next_content}\n\n"  
                     f"---\n\n"  
-                    f"FOCUS SECTION :\n\n"    
+                    f"FOCUS SECTION :\n\n"  
                     f"{current_content}\n\n"  
                     f"---\n\n"  
-                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for {self.audience} provided above:"  
+                    f"Produce a detailed section based on the section of {self.memo_type} memo on the topic of {self.topic} optimized for AUDIENCE provided above. ALWAYS deduplicate your content based on the sections provided:"  
                 )  
-                      
             # Initialize GroupChat  
             groupchat = GroupChat(  
                 agents=[writer, critic, layman_reviewer, financial_reviewer, quality_reviewer, meta_reviewer],  
@@ -231,43 +252,86 @@ class AutoMemoProduction:
             )  
             
             manager = GroupChatManager(groupchat=groupchat, llm_config=llm_config)  
-            # Start chat with writer  
+            # Start chat with writer
+            # with Cache.disk(cache_seed=42) as cache:    
             result = writer.initiate_chat(manager, message=message)  
             final_message = manager.chat_messages[writer][-1]['content']
+            write_text_to_markdown(final_message, filename)     
+        
+        # Second pass for improvement  
+        for index, filename in enumerate(markdown_filenames):  
+            current_content = read_markdown_file_to_text(filename)  
+            previous_content = ""  
+            if index > 0:  
+                previous_content = "\n\n".join(read_markdown_file_to_text(markdown_filenames[i]) for i in range(index))  
+            next_content = ""  
+            if index < len(markdown_filenames) - 1:  
+                next_content = "\n\n".join(read_markdown_file_to_text(markdown_filenames[i]) for i in range(index + 1, len(markdown_filenames)))  
+  
+            if index == 0:  
+                message = (
+                    f"AUDIENCE:\n\n"    
+                    fr"{self.audience}\n\n"  
+                    f"---\n\n"   
+                    f"NEXT SECTION:\n\n"  
+                    f"{next_content}\n\n"  
+                    f"---\n\n"  
+                    f"FOCUS SECTION :\n\n"  
+                    f"{current_content}\n\n"  
+                    f"Refine the introduction for this {self.memo_type} memo optimized for AUDIENCE provided above. return your section with titles and subtitles or bullet points in markdown format when appropriate. ALWAYS deduplicate your content based on the sections provided:"  
+                )  
+            elif index == len(markdown_filenames) - 1:  
+                message = (
+                    f"AUDIENCE:\n\n"     
+                    fr"{self.audience}\n\n"  
+                    f"---\n\n"  
+                    f"PREVIOUS SECTION:\n\n"  
+                    f"{previous_content}\n\n"  
+                    f"---\n\n"  
+                    f"FOCUS SECTION :\n\n"  
+                    f"{current_content}\n\n"  
+                    f"Refine the detailed section based on the section of {self.memo_type} memo optimized for AUDIENCE provided above. return your section with titles and subtitlesor bullet points in markdown format when appropriate. ALWAYS deduplicate your content based on the sections provided:"  
+                )  
+            else:  
+                message = (
+                    f"AUDIENCE:\n\n"    
+                    fr"{self.audience}\n\n"  
+                    f"---\n\n" 
+                    f"PREVIOUS SECTION:\n\n"  
+                    f"{previous_content}\n\n"  
+                    f"---\n\n"  
+                    f"NEXT SECTION:\n\n"  
+                    f"{next_content}\n\n"  
+                    f"---\n\n"  
+                    f"FOCUS SECTION :\n\n"  
+                    f"{current_content}\n\n"  
+                    f"---\n\n"
+ 
+                    f"Refine the detailed section based on the section of {self.memo_type} memo optimized for AUDIENCE provided above. return your section with titles and subtitles or bullet points in markdown format when appropriate. ALWAYS deduplicate your content based on the sections provided:"  
+                )  
+  
+            groupchat = GroupChat(  
+                agents=[writer, critic, layman_reviewer, financial_reviewer, quality_reviewer, meta_reviewer],  
+                messages=[],  
+                max_round=2,  
+                speaker_selection_method=custom_speaker_selection_func,  
+            )  
+  
+            manager = GroupChatManager(groupchat=groupchat, llm_config=llm_config)  
+            result = writer.initiate_chat(manager, message=message)  
+            final_message = manager.chat_messages[writer][-1]['content']  
             write_text_to_markdown(final_message, filename)  
 
-            # try:  
-            #     # Access the chat history and find the last message from 'Writer'  
-            #     chat_history = result.chat_history 
-            #     if chat_history:  
-            #         last_message = None  
-            #         for entry in reversed(chat_history):  
-            #             if entry.get("role") == writer.name:  
-            #                 last_message = entry.get("content")  
-            #                 break  
-                    
-            #         if last_message:  
-            #             write_text_to_markdown(last_message, filename)  
-            #             logging.info(f"Completed writing section for {filename}")  
-            #         else:  
-            #             logging.error(f"No message from  {writer.name} found in chat history for {filename}")  
-            #     else:  
-            #         logging.error(f"No chat history found in result for {filename}")  
-            # except Exception as e:  
-            #     logging.error(f"Failed to process chat result for {filename}: {e}")  
-            # write_text_to_markdown(result['sender':'Writer']['response'], filename)  
-            # logging.info(f"Completed writing section for {filename}")  
-    
-
-    def combine_sections_to_docx(self, markdown_directory, docx_path):
-        process_markdown_files_in_directory(markdown_directory, docx_path)
-        logging.info(f"Combined markdown sections into docx: {docx_path}")
+    def combine_sections_to_docx(self):
+        markdown_to_docx()
+        logging.info(f"Combined markdown sections into docx: /src/result/result.docx")
 
     def run(self):
+        clear_previous_results("./src/result/intermediate_results", "./src/result/result.docx")  
         outline = self.create_outline()
         markdown_filenames = self.parse_outline_to_markdown_chunks(outline)
         self.write_sections(markdown_filenames)
-        self.combine_sections_to_docx("./src/result/intermediate_results", "./src/result/result.docx")
+        self.combine_sections_to_docx()
 
 
 if __name__ == "__main__":
@@ -275,5 +339,4 @@ if __name__ == "__main__":
     topic, audience, memo_type = get_user_inputs()
     producer = AutoMemoProduction(topic=topic, audience=audience, memo_type=memo_type)
     producer.run()
-
 

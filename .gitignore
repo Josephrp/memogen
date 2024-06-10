@@ -1,10 +1,14 @@
-# deprecated / notes files
+# markdown
 
-/src/agents.py 
+*.md 
+*.docx
 
-# config files with keys
-
-/src/OAI_CONFIG_LIST.json
+# ChromaDB
+/src/tmp
+/src/chromadb
+*.bin
+*.pkl
+*.sqlite3
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
