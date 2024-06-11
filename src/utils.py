@@ -10,12 +10,11 @@ from docx.oxml import OxmlElement
 from docx.enum.style import WD_STYLE_TYPE  
 from docx.text.paragraph import Paragraph
 from typing import Optional,  Dict, List, Tuple
-import re
-import os
-import json
-import logging
-import glob
-
+import re  
+import os  
+import json  
+import logging  
+import glob  
 
 def write_text_to_markdown(text, file_name, directory='./src/result/intermediate_results'):
     """
@@ -48,43 +47,20 @@ def write_text_to_markdown(text, file_name, directory='./src/result/intermediate
     
     print(f'Text has been written to {file_path}')
 
-def parse_markdown(markdown_str, output_folder="./src/result/intermediate_results"):
-    """
-    Parses a markdown string into several markdown strings divided by titles,
-    then saves each text string as a separate markdown document in a folder.
-
-    Args:
-        markdown_str (str): The markdown content as a string.
-        output_folder (str): The folder to save the numbered markdown files.
-
-    Returns:
-        List of filenames of the created markdown documents.
-    """
-    # Regex pattern to match markdown titles (assuming titles start with #)
-    title_pattern = re.compile(r'(#+\s.*\n)')
-    
-    # Find all titles and their start positions
-    matches = list(title_pattern.finditer(markdown_str))
-    
-    # Ensure the output folder exists
-    os.makedirs(output_folder, exist_ok=True)
-    
-    filenames = []
-    
-    # Iterate over the matches and extract content
-    for i in range(len(matches)):
-        start_pos = matches[i].start()
-        end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(markdown_str)
-        
-        section_str = markdown_str[start_pos:end_pos]
-        
-        # Write the section to a separate markdown file
-        filename = os.path.join(output_folder, f'section_{i + 1}.md')
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(section_str)
-        
-        filenames.append(filename)
-    
+def parse_markdown(markdown_str, output_folder="./src/result/intermediate_results"):  
+    """Parses a markdown string into several markdown strings divided by titles, then saves each text string as a separate markdown document in a folder."""  
+    title_pattern = re.compile(r'(#+\s.*\n)')  
+    matches = list(title_pattern.finditer(markdown_str))  
+    os.makedirs(output_folder, exist_ok=True)  
+    filenames = []  
+    for i in range(len(matches)):  
+        start_pos = matches[i].start()  
+        end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(markdown_str)  
+        section_str = markdown_str[start_pos:end_pos]  
+        filename = os.path.join(output_folder, f'section_{i + 1}.md')  
+        with open(filename, 'w', encoding='utf-8') as f:  
+            f.write(section_str)  
+        filenames.append(filename)  
     return filenames
 
 def read_markdown_file_to_text(file_path):
@@ -125,139 +101,99 @@ def clear_previous_results(intermediate_results_directory, final_result_path):
         logging.error(f"Error clearing previous results: {e}")  
 
 
+def markdown_to_docx_format(markdown_text: str, doc: Document) -> None:  
+    """Converts markdown content to a python-docx document."""  
+    try:  
+        header_map = {  
+            'h1': 0,  
+            'h2': 1,  
+            'h3': 2,  
+            'h4': 3,  
+            'h5': 4,  
+            'h6': 5  
+        }  
+  
+        def add_styled_text(paragraph, text):  
+            """Add styled text (bold, italic, code) to a paragraph."""  
+            parts = re.split(r'(\*\*.*?\*\*|\*.*?\*|`.*?`)', text)  
+            for part in parts:  
+                if part.startswith('**') and part.endswith('**'):  
+                    run = paragraph.add_run(part[2:-2])  
+                    run.bold = True  
+                elif part.startswith('*') and part.endswith('*'):  
+                    run = paragraph.add_run(part[1:-1])  
+                    run.italic = True  
+                elif part.startswith('`') and part.endswith('`'):  
+                    run = paragraph.add_run(part[1:-1])  
+                    run.font.name = 'Courier New'  
+                else:  
+                    paragraph.add_run(part)  
+  
+        list_stack = []  
+        current_list_type = None  
+        lines = markdown_text.split('\n')  
+  
+        for line in lines:  
+            if re.match(r'#+\s', line):  
+                # Check for headers  
+                match = re.match(r'^(#+)\s+(.*)', line)  
+                if match:  
+                    header_level = len(match.group(1))  
+                    header_text = match.group(2)  
+                    doc.add_heading(header_text.strip(), level=header_map.get(f'h{header_level}', 1))  
+            elif line.startswith('```') and line.endswith('```'):  
+                # Check for code blocks  
+                code_text = line.strip('```').strip()  
+                doc.add_paragraph(code_text, style='Quote')  
+            elif line.startswith('- '):  
+                # Handle unordered list  
+                if current_list_type != 'ul':  
+                    current_list_type = 'ul'  
+                    list_stack.append(current_list_type)  
+                paragraph = doc.add_paragraph(line[2:].strip(), style='List Bullet')  
+            elif re.match(r'^\d+\.', line):  
+                # Handle ordered list  
+                if current_list_type != 'ol':  
+                    current_list_type = 'ol'  
+                    list_stack.append(current_list_type)  
+                paragraph = doc.add_paragraph(line.strip(), style='List Number')  
+            elif '|' in line and '-' not in line:  
+                # Handle table rows  
+                cells = [cell.strip() for cell in line.split('|') if cell.strip()]  
+                if not hasattr(doc, '_current_table'):  
+                    doc._current_table = doc.add_table(rows=1, cols=len(cells))  
+                    doc._current_table.style = 'Table Grid'  
+                    hdr_cells = doc._current_table.rows[0].cells  
+                    for i, cell in enumerate(cells):  
+                        hdr_cells[i].text = cell  
+                else:  
+                    row_cells = doc._current_table.add_row().cells  
+                    for i, cell in enumerate(cells):  
+                        row_cells[i].text = cell  
+            else:  
+                # Handle normal paragraphs  
+                paragraph = doc.add_paragraph()  
+                add_styled_text(paragraph, line.strip())  
+  
+        if hasattr(doc, '_current_table'):  
+            del doc._current_table  
+  
+    except Exception as e:  
+        print(f"An error occurred while converting markdown to docx format: {e}")  
+  
 def markdown_to_docx(markdown_directory: str = "./src/result/intermediate_results", docx_save_path: str = "./src/result/result.docx"):  
-    """  
-    Iterates over each markdown file in a directory, converts them to a single string with python-docx compatible formatting, and writes them to a .docx file.  
-      
-    Args:  
-        markdown_directory (str): The directory containing markdown files.  
-        docx_save_path (str): The path to save the combined .docx file.  
-          
-    Returns:  
-        None  
-    """  
-      
-    def markdown_to_docx_format(markdown_text: str) -> str:  
-        """  
-        Converts markdown content to a single string with python-docx compatible formatting.  
-          
-        :param markdown_text: The raw text containing markdown elements.  
-        :return: A single string with the complete text, formatted for further processing.  
-        """  
-        try:  
-            # Remove ```markdown ... ``` and ``` code blocks  
-            markdown_text = re.sub(r'^```markdown\s*|```$', '', markdown_text, flags=re.DOTALL)  
-  
-            # Convert markdown to HTML  
-            html = markdown(markdown_text)  
-  
-            # Parse HTML using BeautifulSoup  
-            soup = BeautifulSoup(html, 'html.parser')  
-            formatted_text = ""  
-  
-            # Define mapping for header tags  
-            header_map = {  
-                'h1': ('Heading 1', 1),  
-                'h2': ('Heading 2', 2),  
-                'h3': ('Heading 3', 3),  
-                'h4': ('Heading 4', 4),  
-                'h5': ('Heading 5', 5),  
-                'h6': ('Heading 6', 6)  
-            }  
-  
-            # Helper function to add text with possible styling  
-            def add_styled_text(element):  
-                text = ''  
-                if element.name == 'strong':  
-                    text += '**' + element.text + '**'  
-                elif element.name == 'em':  
-                    text += '*' + element.text + '*'  
-                elif element.name == 'code':  
-                    text += '`' + element.text + '`'  
-                else:  
-                    text += element.text  
-                return text  
-  
-            # Iterate through HTML elements  
-            for tag in soup.contents:  
-                if tag.name in header_map:  
-                    formatted_text += f"\n\n{header_map[tag.name][0]}: {tag.text.strip()}\n"  
-                elif tag.name == 'p':  
-                    p_text = ''.join(add_styled_text(child) for child in tag.children)  
-                    formatted_text += f"\n{p_text}\n"  
-                elif tag.name == 'ul':  
-                    for li in tag.find_all('li'):  
-                        formatted_text += f"\n- {li.text.strip()}"  
-                elif tag.name == 'ol':  
-                    for li in tag.find_all('li'):  
-                        formatted_text += f"\n1. {li.text.strip()}"  
-                elif tag.name == 'pre':  
-                    code_block = tag.find('code')  
-                    if code_block:  
-                        formatted_text += f"\n\n```\n{code_block.text}\n```\n"  
-                elif tag.name == 'table':  
-                    # Process HTML tables  
-                    rows = tag.find_all('tr')  
-                    for row in rows:  
-                        columns = row.find_all(['th', 'td'])  
-                        row_text = ' | '.join(col.text.strip() for col in columns)  
-                        formatted_text += f"\n| {row_text} |"  
-                else:  
-                    # Check for markdown tables  
-                    table_pattern = re.compile(r'\|(.+?)\|\n(\|[-:]+\|)+\n((\|.+?\|\n)+)', re.DOTALL)  
-                    markdown_tables = table_pattern.findall(markdown_text)  
-                    for table in markdown_tables:  
-                        formatted_text += f"\n|{table[0]}|\n{table[1]}\n{table[2]}"  
-            return formatted_text.strip()  
-        except Exception as e:  
-            print(f"An error occurred while converting markdown to docx format: {e}")  
-            return ""  
-  
-    # Ensure the markdown directory exists  
+    """Iterates over each markdown file in a directory, converts them to a single string with python-docx compatible formatting, and writes them to a .docx file."""  
     if not os.path.isdir(markdown_directory):  
         raise ValueError(f"The specified directory does not exist: {markdown_directory}")  
   
-    # Create a new Document or load an existing one  
-    if os.path.exists(docx_save_path):  
-        doc = Document(docx_save_path)  
-    else:  
-        doc = Document()  
+    doc = Document()  
   
-    # Iterate over each markdown file in the directory  
     for filename in os.listdir(markdown_directory):  
         if filename.endswith('.md'):  
             filepath = os.path.join(markdown_directory, filename)  
-            # Read the markdown file content  
             with open(filepath, 'r', encoding='utf-8') as file:  
                 markdown_text = file.read()  
-            # Convert markdown text to docx format and append it to the document  
-            formatted_text = markdown_to_docx_format(markdown_text)  
-            paragraphs = formatted_text.split('\n\n')  
-            for paragraph in paragraphs:  
-                if ': ' in paragraph:  
-                    try:  
-                        # Check for headers  
-                        header_type, text = paragraph.split(': ', 1)  
-                        level = int(''.join(filter(str.isdigit, header_type)))  
-                        doc.add_heading(text.strip(), level=level)  
-                    except ValueError as ve:  
-                        print(f"Header parsing error: {ve}, Paragraph: {paragraph}")  
-                        doc.add_paragraph(paragraph)  
-                elif paragraph.startswith('```') and paragraph.endswith('```'):  
-                    # Check for code blocks  
-                    code_text = paragraph.strip('```').strip()  
-                    doc.add_paragraph(code_text, style='Quote')  
-                else:  
-                    # Handle bullet points and other text  
-                    lines = paragraph.split('\n')  
-                    for line in lines:  
-                        if line.startswith('- '):  
-                            doc.add_paragraph(line.strip('- '))  
-                        elif line.startswith('1. '):  
-                            doc.add_paragraph(line.strip('1. '))  
-                        else:  
-                            doc.add_paragraph(line)  
+            markdown_to_docx_format(markdown_text, doc)  
   
-    # Save the combined document  
     doc.save(docx_save_path)  
     print(f"Combined document saved at: {docx_save_path}")  

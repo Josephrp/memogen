@@ -10,15 +10,15 @@ llm_config = {"model": "gpt-4o",
               "temperature": 0.7, #change this according to your needs
     }
 
-## AZURE 
-filter_criteria = {"model": ["gptonic"]}
 
+filter_criteria = {"model": ["gptonic"]}
+### AZURE 
 # llm_config =     {
 #         "model": "your_deployment_name_here", # mine is "tonicgpt"
 #         "api_key": "your_api_key_here",
-#         "base_url": "your_endpoint_url_here", # https://eastus2.api.cognitive.microsoft.com/
+#         "base_url": "your_deployment_endpoint_here", # https://eastus2.api.cognitive.microsoft.com/
 #         "api_type": "azure",
-#         "api_version": "your_api_version_here", # eg "2024-02-01" for gpt-4o
+#         "api_version": "your_api_version_herre", # eg "2024-02-01" for gpt-4o
 #         "max_tokens": 1800 ,# change this according to your needs
 #         "temperature": 0.7, #change this according to your needs
 #    }
